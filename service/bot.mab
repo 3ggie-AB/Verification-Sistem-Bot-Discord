@@ -1,0 +1,82 @@
+package service
+
+import (
+	"strings"
+	"fmt"
+
+	"github.com/bwmarrin/discordgo"
+	"crypto-member/db"
+	"crypto-member/config"
+)
+
+
+func MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	var _ = config.Get("BOT_TOKEN")
+	var ServerID =  config.Get("ID_SERVER")
+	var MemberRoleID = config.Get("ID_ROLE")
+
+	// fmt.Println("Data Bot Token :", BotToken)
+	// fmt.Println("Data Server ID :", ServerID)
+	// fmt.Println("Data MemberRoleID :", MemberRoleID)
+	
+	if m.Author.Bot {
+		fmt.Println("Bukan Bot Author")
+		return
+	}
+	
+	// pastikan DM
+	channel, err := s.Channel(m.ChannelID) // fetch langsung ke API
+	if err != nil {
+		fmt.Println("Error fetching channel:", err)
+		return
+	}
+
+	if channel.Type != discordgo.ChannelTypeDM {
+		return
+	}
+	
+	content := strings.TrimSpace(m.Content)
+	fmt.Println(content)
+
+	// cek apakah user baru pertama DM
+	if strings.ToLower(content) == "halo" || strings.ToLower(content) == "hi" {
+		s.ChannelMessageSend(m.ChannelID, "Halo! Ketik kode aktivasi membermu sekarang 😎")
+		return
+	}
+
+	// sekarang anggap message adalah token
+	token := content
+	user, err := db.RedeemDiscordCode(token, m.Author.ID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, err.Error())
+		return
+	}
+
+	if user.NamaDiscord != nil && *user.NamaDiscord != "" {
+		s.ChannelMessageSend(m.ChannelID, "Token ini sudah digunakan untuk akun lain 😢")
+		return
+	}
+
+	// update DiscordID
+	err = db.UpdateUserDiscordID(user.ID, m.Author.ID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Gagal menyimpan data, coba lagi nanti 😢")
+		return
+	}
+
+	// assign role
+	member, err := s.GuildMember(ServerID, m.Author.ID)
+	if err != nil {
+		// kalau user belum join server
+		s.ChannelMessageSend(m.ChannelID, "Kamu belum join server, join dulu ya 😢")
+		return
+	}
+
+	err = s.GuildMemberRoleAdd(ServerID, member.User.ID, MemberRoleID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Gagal assign role 😢")
+		return
+	}
+
+	s.ChannelMessageSend(m.ChannelID, "Token valid! Kamu sudah masuk ke server 🎉")
+}
