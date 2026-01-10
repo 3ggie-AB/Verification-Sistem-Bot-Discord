@@ -14,22 +14,18 @@ import (
 func main() {
 	config.LoadEnv()
 	db.Connect()
+
 	app := fiber.New()
 	app.Use(logger.New())
 	routes.Register(app)
-	service.StartBot()
+
+	// Jalankan bot di background
+	go service.StartBot()
 
 	fmt.Println("Bot is running...")
-	select {}
 
-	// go func() {
-	// 	for {
-	// 		// service.ExpireMemberships()
-	// 		time.Sleep(1 * time.Hour)
-	// 	}
-	// }()
-
-	// go bot.Start() // bot jalan barengan API
-
-	app.Listen(":3000")
+	// Jalankan API
+	if err := app.Listen(":3000"); err != nil {
+		fmt.Println("Error starting Fiber:", err)
+	}
 }
