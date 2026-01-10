@@ -2,8 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"crypto-member/config"

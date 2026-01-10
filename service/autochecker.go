@@ -21,7 +21,7 @@ import (
 // 	}()
 // }
 
-func checkAndRemoveExpiredMembers(dg *discordgo.Session) {
+func CheckAndRemoveExpiredMembers(dg *discordgo.Session) {
 	ServerID := config.Get("ID_SERVER")
 	MemberRoleID := config.Get("ID_ROLE")
 

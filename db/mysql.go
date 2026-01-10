@@ -151,17 +151,14 @@ func RedeemDiscordCode(code string, discordName string, discordID string) (*mode
 	now := time.Now()
 	user.NamaDiscord = &discordName
 	user.IDDiscord = &discordID
-	now := time.Now()
 	// cek apakah user punya MemberExpiredAt
+	var newExpiry time.Time
 	if user.MemberExpiredAt != nil && user.MemberExpiredAt.After(now) {
-		// masih aktif, extend dari MemberExpiredAt
-		newExpiry := user.MemberExpiredAt.AddDate(0, payment.MonthCount, 0)
-		user.MemberExpiredAt = &newExpiry
+		newExpiry = user.MemberExpiredAt.AddDate(0, int(payment.MonthCount), 0)
 	} else {
-		// expired atau kosong, mulai dari sekarang
-		newExpiry := now.AddDate(0, payment.MonthCount, 0)
-		user.MemberExpiredAt = &newExpiry
+		newExpiry = now.AddDate(0, int(payment.MonthCount), 0)
 	}
+	user.MemberExpiredAt = &newExpiry
 	if err := DB.Save(&user).Error; err != nil {
 		return nil, fmt.Errorf("Gagal update user")
 	}
