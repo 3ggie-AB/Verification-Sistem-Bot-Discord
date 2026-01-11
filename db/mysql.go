@@ -69,6 +69,7 @@ func Connect() {
 		&models.User{},
 		&models.DiscordCode{},
 		&models.Payment{},
+		&models.Coupon{},
 	)
 	if err != nil {
 		log.Fatal("❌ AutoMigrate failed:", err)
@@ -126,25 +127,34 @@ func UpdateUserDiscordID(userID uint, discordID string) error {
 		}).Error
 }
 
-func RedeemDiscordCode(code string, discordName string, discordID string) (*models.User, error) {
+func RedeemDiscordCode(code string, discordName string, discordID string) (*models.User, *models.DiscordCode, error) {
 	var dcode models.DiscordCode
-	if err := DB.Preload("Payment").Where("code = ? AND is_used = false", code).First(&dcode).Error; err != nil {
-		return nil, fmt.Errorf("Kode salah atau sudah digunakan")
+	err := DB.Preload("Payment").Where("code = ? AND is_used = false", code).First(&dcode); 
+	if err.Error != nil {
+		return nil, nil, fmt.Errorf("Kode salah atau sudah digunakan :",err.Error)
 	}
+
+	fmt.Println("Kodeku : ", dcode)
 
 	// ambil user via payment
 	var payment models.Payment
 	if err := DB.First(&payment, dcode.PaymentID).Error; err != nil {
-		return nil, fmt.Errorf("Payment tidak ditemukan")
+		return nil, nil, fmt.Errorf("Payment tidak ditemukan")
 	}
 
 	var user models.User
 	if err := DB.First(&user, payment.UserID).Error; err != nil {
-		return nil, fmt.Errorf("User tidak ditemukan")
+		return nil, nil, fmt.Errorf("User tidak ditemukan")
+	}
+	
+	fmt.Println("Mau cek Nama Discord Nih")
+
+	if discordName == "" {
+		return nil, nil, fmt.Errorf("Nama Discord wajib diisi")
 	}
 
-	if user.NamaDiscord != nil && *user.NamaDiscord != "" {
-		return nil, fmt.Errorf("Token ini sudah dipakai akun lain")
+	if discordID == "" {
+		return nil, nil, fmt.Errorf("ID Discord wajib diisi")
 	}
 
 	// update user dan discord code
@@ -160,14 +170,8 @@ func RedeemDiscordCode(code string, discordName string, discordID string) (*mode
 	}
 	user.MemberExpiredAt = &newExpiry
 	if err := DB.Save(&user).Error; err != nil {
-		return nil, fmt.Errorf("Gagal update user")
+		return nil, nil, fmt.Errorf("Gagal update user")
 	}
 
-	dcode.IsUsed = true
-	dcode.UsedAt = &now
-	if err := DB.Save(&dcode).Error; err != nil {
-		return nil, fmt.Errorf("Gagal update discord code")
-	}
-
-	return &user, nil
+	return &user, &dcode, nil
 }

@@ -17,4 +17,5 @@ type Payment struct {
 	RejectReason   *string
 	PaidAt         *time.Time
 	CreatedAt      time.Time
+	DiscordCode    *DiscordCode `gorm:"foreignKey:PaymentID"`
 }

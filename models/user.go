@@ -8,7 +8,7 @@ type User struct {
 	Username  string    `gorm:"unique;not null"`
 	Password  string    `gorm:"not null"`
 	Role      string    `gorm:"type:varchar(20);default:user"` // default role = user
-
+	
 	MemberExpiredAt *time.Time
 	NamaLengkap *string
 	IDDiscord *string `gorm:"unique"`
@@ -16,6 +16,7 @@ type User struct {
 	NomorHp *string
 	From *string
 	Token *string    `gorm:"unique"` 
+	// Avatar    *string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

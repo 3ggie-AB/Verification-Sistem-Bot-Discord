@@ -27,7 +27,7 @@ func Register(app *fiber.App) {
 	api.Post("/checkout", handlers.CheckoutMembership)
 
 	api.Get("/payments", handlers.GetPayments)
-	api.Get("/payment/:id/approve", handlers.GetPayments)
+	api.Post("/payments/:id/approve", handlers.ApprovePayment)
 	api.Post("/payments/:id/reject", handlers.RejectPayment)
 
 	coupon := api.Group("/coupons")
@@ -36,4 +36,10 @@ func Register(app *fiber.App) {
 	coupon.Get("/:id", handlers.GetCouponByID)
 	coupon.Put("/:id", handlers.UpdateCoupon)
 	coupon.Delete("/:id", handlers.DeleteCoupon)
+
+	users := api.Group("/users")
+	users.Get("/", handlers.GetUsers)
+	users.Post("/", handlers.CreateUser)
+	users.Put("/:id", handlers.UpdateUser)
+	users.Delete("/:id", handlers.DeleteUser)
 }

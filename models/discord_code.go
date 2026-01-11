@@ -9,4 +9,5 @@ type DiscordCode struct {
 	IsUsed    bool       `gorm:"default:false"`
 	UsedAt    *time.Time
 	CreatedAt time.Time
+	Payment  Payment `gorm:"foreignKey:PaymentID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }

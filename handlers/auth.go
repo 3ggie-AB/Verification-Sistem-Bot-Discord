@@ -10,6 +10,7 @@ import (
 
 	"crypto/rand"
 	"encoding/hex"
+	"strings"
 )
 
 // =====================
@@ -65,24 +66,36 @@ func Register(c *fiber.Ctx) error {
 // =====================
 func Login(c *fiber.Ctx) error {
 	type req struct {
-		Username string `json:"username"`
+		Login    string `json:"login"` // username atau email
 		Password string `json:"password"`
 	}
+
 	var body req
 	if err := c.BodyParser(&body); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+		return c.Status(400).JSON(fiber.Map{"message": "invalid body"})
 	}
 
 	var user models.User
-	if err := db.DB.Where("username = ?", body.Username).First(&user).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "user not found"})
+	query := db.DB
+
+	if strings.Contains(body.Login, "@") {
+		query = query.Where("email = ?", body.Login)
+	} else {
+		query = query.Where("username = ?", body.Login)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password)); err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid password"})
+	if err := query.First(&user).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"message": "user not found"})
 	}
 
-	// generate token baru
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(user.Password),
+		[]byte(body.Password),
+	); err != nil {
+		return c.Status(401).JSON(fiber.Map{"message": "invalid password"})
+	}
+
+	// generate token
 	tokenBytes := make([]byte, 16)
 	rand.Read(tokenBytes)
 	token := hex.EncodeToString(tokenBytes)
@@ -91,8 +104,8 @@ func Login(c *fiber.Ctx) error {
 	user.UpdatedAt = time.Now()
 	db.DB.Save(&user)
 
-	// jangan kirim password
 	user.Password = ""
+
 	return c.JSON(fiber.Map{
 		"message": "login success",
 		"user":    user,

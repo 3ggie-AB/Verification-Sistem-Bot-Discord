@@ -6,6 +6,8 @@ import (
 	"crypto-member/config"
 	"errors"
 	"log"
+	"time"
+	"fmt"
 )
 
 func InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -83,7 +85,7 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	// Redeem token dari DB
-	user, err := db.RedeemDiscordCode(token, username, memberID)
+	user, dccode, err := db.RedeemDiscordCode(token, username, memberID)
 	if err != nil {
 		reply.Content = err.Error()
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -93,12 +95,14 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
+	fmt.Println("Berhasil Step Redeem")
 	// Assign role di server
 	ServerID := config.Get("ID_SERVER")
 	MemberRoleID := config.Get("ID_ROLE")
-
-	_, err = s.GuildMember(ServerID, i.Member.User.ID)
+	
+	_, err = s.GuildMember(ServerID, *user.IDDiscord)
 	if err != nil {
+		fmt.Println("Kamu belum join server 😢")
 		reply.Content = "Kamu belum join server 😢"
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -109,6 +113,7 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 
 	err = s.GuildMemberRoleAdd(ServerID, *user.IDDiscord, MemberRoleID)
 	if err != nil {
+		fmt.Println("Gagal assign role 😢")
 		reply.Content = "Gagal assign role 😢"
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -124,7 +129,23 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		Data: reply,
 	})
 
-	log.Printf("User %s redeem token %s sukses dan role diassign", i.Member.User.ID, token)
+	now := time.Now()
+	dccode.IsUsed = true
+	dccode.UsedAt = &now
+	if err := db.DB.Save(&dccode).Error; err != nil {
+		reply.Content = "Gagal Update Token ke DB !!!"
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: reply,
+		})
+	}
+	
+	reply.Content = "Berhasil Menjadikanmu Member CryptoLabs Akademi ✨"
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: reply,
+	})
+	log.Printf("User %s redeem token %s sukses dan role diassign", user.IDDiscord, token)
 }
 
 func getModalValue(i *discordgo.InteractionCreate, customID string) (string, error) {
