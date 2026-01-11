@@ -59,7 +59,16 @@ func CheckoutMembership(c *fiber.Ctx) error {
 	}
 
 	// === HITUNG PAYMENT ===
-	pricePerMonth := 200000.0
+	pricePerMonth := 0.0
+	if (monthCount < 3){
+		pricePerMonth = 200000.0
+	} else if (monthCount < 6){
+		pricePerMonth = 190000.0
+	} else if (monthCount < 12){
+		pricePerMonth = 175000.0
+	} else {
+		pricePerMonth = 167000.0
+	}
 	originalAmount := pricePerMonth * float64(monthCount)
 
 	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount)
