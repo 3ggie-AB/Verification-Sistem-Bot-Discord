@@ -20,6 +20,9 @@ func Register(app *fiber.App) {
 			"status": "oke",
 		})
 	})
+	app.Head("/health", func(c *fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusOK)
+	})
 	
 	api := app.Group("/api")
 
