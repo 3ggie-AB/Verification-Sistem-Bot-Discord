@@ -2,15 +2,23 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
+
 	"crypto-member/config"
 	"crypto-member/service"
 )
 
 func main() {
-	BotToken := config.Get("BOT_TOKEN")
-	dg, err := discordgo.New("Bot " + BotToken)
+	config.LoadEnv()
+
+	botToken := config.Get("BOT_TOKEN")
+	if botToken == "" {
+		log.Fatal("BOT_TOKEN kosong")
+	}
+
+	dg, err := discordgo.New("Bot " + botToken)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -21,8 +29,26 @@ func main() {
 	}
 	defer dg.Close()
 
-	// langsung check expired satu kali
-	service.CheckAndRemoveExpiredMembers(dg)
+	log.Println("Discord connected")
 
-	log.Println("Cek expired selesai")
+	// 🔥 RUN SEKALI SAAT START
+	runCheck(dg)
+
+	// ⏱️ LOOP CRON
+	interval := 4 * time.Hour
+	for {
+		time.Sleep(interval)
+		runCheck(dg)
+	}
+}
+
+func runCheck(dg *discordgo.Session) {
+	log.Println("Start expired check")
+
+	if err := service.CheckAndRemoveExpiredMembers(dg); err != nil {
+		log.Println("Error:", err)
+		return
+	}
+
+	log.Println("Expired check done")
 }

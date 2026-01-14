@@ -10,7 +10,26 @@ import (
 	"path/filepath"
 	"math/rand"
 	"time"
+	"math"
 )
+
+func pricePerMonth(monthCount int) float64 {
+	raw := 0.0
+
+	switch {
+	case monthCount >= 12:
+		raw = 1800000.0 / 12
+	case monthCount >= 6:
+		raw = 1000000.0 / 6
+	case monthCount >= 3:
+		raw = 550000.0 / 3
+	default:
+		raw = 200000.0
+	}
+
+	// pembulatan ke atas ke ribuan
+	return math.Ceil(raw/1000) * 1000
+}
 
 func CheckoutMembership(c *fiber.Ctx) error {
 	user := c.Locals("user").(*models.User)
@@ -36,7 +55,7 @@ func CheckoutMembership(c *fiber.Ctx) error {
 	// validasi ext
 	ext := filepath.Ext(file.Filename)
 	allowed := map[string]bool{
-		".jpg": true, ".jpeg": true, ".png": true, ".pdf": true,
+		".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".heic": true, ".pdf": true,
 	}
 	if !allowed[strings.ToLower(ext)] {
 		return c.Status(400).JSON(fiber.Map{
@@ -59,16 +78,7 @@ func CheckoutMembership(c *fiber.Ctx) error {
 	}
 
 	// === HITUNG PAYMENT ===
-	pricePerMonth := 0.0
-	if (monthCount < 3){
-		pricePerMonth = 200000.0
-	} else if (monthCount < 6){
-		pricePerMonth = 190000.0
-	} else if (monthCount < 12){
-		pricePerMonth = 175000.0
-	} else {
-		pricePerMonth = 167000.0
-	}
+	pricePerMonth := pricePerMonth(monthCount)
 	originalAmount := pricePerMonth * float64(monthCount)
 
 	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount)

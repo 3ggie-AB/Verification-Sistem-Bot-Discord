@@ -15,6 +15,12 @@ func Register(app *fiber.App) {
 			"Status": "💚 Online",
 		})
 	})
+	app.Get("/health", func (c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status": "oke",
+		})
+	})
+	
 	api := app.Group("/api")
 
 	api.Post("/register", handlers.Register)

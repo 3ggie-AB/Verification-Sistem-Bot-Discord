@@ -22,17 +22,36 @@ func main() {
 	app := fiber.New()
 	app.Use(logger.New())
 	app.Static("/bukti", "./bukti")
+
+	app.Use(func(c *fiber.Ctx) error {
+		c.Request().SetBodyLimit(4 * 1024 * 1024)
+		return c.Next()
+	})
 	
+	app.Use(func(c *fiber.Ctx) error {
+		ua := c.Get("User-Agent")
+		if ua == "" || ua == "python-requests/2.31.0" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Bot detected",
+			})
+		}
+		return c.Next()
+	})
+
 	// Rate limiter: max 10 request per 10 detik per IP
 	app.Use(limiter.New(limiter.Config{
 		Max:        10,
 		Expiration: 10 * time.Second,
 		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
+			token := c.Get("Authorization") // per token if exists
+			if token != "" {
+				return c.IP() + ":" + token
+			}
+			return c.IP() // fallback anonymous
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-				"error": "Too many requests, please try again later.",
+				"error": "Too many requests, try later",
 			})
 		},
 	}))
@@ -43,6 +62,22 @@ func main() {
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
     	AllowCredentials: true,
 	}))
+
+	app.Get("/hidden-admin-trap", func(c *fiber.Ctx) error {
+		// log IP, could block temporarily
+		fmt.Println("Bot hit honeypot:", c.IP())
+		return c.Status(fiber.StatusForbidden).SendString("Forbidden")
+	})
+
+	blockedIPs := map[string]bool{
+		"1.2.3.4": true,
+	}
+	app.Use(func(c *fiber.Ctx) error {
+		if blockedIPs[c.IP()] {
+			return c.Status(fiber.StatusForbidden).SendString("Blocked IP")
+		}
+		return c.Next()
+	})
 
 	routes.Register(app)
 
