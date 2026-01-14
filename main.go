@@ -19,13 +19,12 @@ func main() {
 	config.LoadEnv()
 	db.Connect()
 
-	app := fiber.New()
-	app.Use(logger.New())
-	app.Static("/bukti", "./bukti")
-
 	app := fiber.New(fiber.Config{
 		BodyLimit: 4 * 1024 * 1024,
 	})
+
+	app.Use(logger.New())
+	app.Static("/bukti", "./bukti")
 	
 	app.Use(func(c *fiber.Ctx) error {
 		ua := c.Get("User-Agent")
