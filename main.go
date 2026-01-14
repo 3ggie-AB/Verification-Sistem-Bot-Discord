@@ -23,9 +23,8 @@ func main() {
 	app.Use(logger.New())
 	app.Static("/bukti", "./bukti")
 
-	app.Use(func(c *fiber.Ctx) error {
-		c.Request().SetBodyLimit(4 * 1024 * 1024)
-		return c.Next()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 4 * 1024 * 1024,
 	})
 	
 	app.Use(func(c *fiber.Ctx) error {
