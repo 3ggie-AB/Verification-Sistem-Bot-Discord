@@ -166,7 +166,7 @@ func CheckoutMembership(c *fiber.Ctx) error {
 				embed := &discordgo.MessageEmbed{
 					Title: "💰 Checkout Membership Baru :",
 					Description: fmt.Sprintf(
-						"**Nama User : %s\nJumlah bulan: %d\nTotal: Rp %s**\n\nCek Bukti : https://cryptolabsakademi.site/%s",
+						"**Nama User : %s\nJumlah bulan: %d\nTotal: Rp %s**\n\nCek Bukti : https://backend.cryptolabsakademi.site/%s",
 						user.Username, monthCount, formatRupiah(finalAmount), buktiPath,
 					),
 					Color:     0x00FF00,

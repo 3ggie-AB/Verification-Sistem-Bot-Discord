@@ -40,6 +40,7 @@ func Register(app *fiber.App) {
 	api.Post("/payments/:id/reject", handlers.RejectPayment)
 
 	coupon := api.Group("/coupons")
+	coupon.Get("/check", handlers.CheckCouponByCode)
 	coupon.Post("/", handlers.CreateCoupon)
 	coupon.Get("/", handlers.GetCoupons)
 	coupon.Get("/:id", handlers.GetCouponByID)

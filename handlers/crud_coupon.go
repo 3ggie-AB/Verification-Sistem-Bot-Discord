@@ -172,3 +172,54 @@ func DeleteCoupon(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Coupon berhasil dihapus"})
 }
+
+func CheckCouponByCode(c *fiber.Ctx) error {
+	code := c.Query("code")
+	if code == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Kode coupon wajib diisi",
+		})
+	}
+
+	var coupon models.Coupon
+	if err := db.DB.Where("code = ?", code).First(&coupon).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Coupon tidak ditemukan",
+		})
+	}
+
+	now := time.Now()
+
+	// validasi coupon
+	if !coupon.IsActive {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Coupon tidak aktif",
+		})
+	}
+
+	if coupon.ExpiredAt != nil && coupon.ExpiredAt.Before(now) {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Coupon sudah kadaluarsa",
+		})
+	}
+
+	if coupon.UsedCount >= coupon.Quota {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Quota coupon sudah habis",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Coupon valid",
+		"coupon": fiber.Map{
+			"id":            coupon.ID,
+			"code":          coupon.Code,
+			"type":          coupon.Type,
+			"value":         coupon.Value,
+			"max_discount":  coupon.MaxDiscount,
+			"quota":         coupon.Quota,
+			"used_count":    coupon.UsedCount,
+			"expired_at":    coupon.ExpiredAt,
+		},
+	})
+}
