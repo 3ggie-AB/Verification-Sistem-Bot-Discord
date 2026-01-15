@@ -85,7 +85,7 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	// Redeem token dari DB
-	user, dccode, err := db.RedeemDiscordCode(token, username, memberID)
+	user, dccode, payment, err := db.RedeemDiscordCode(token, username, memberID)
 	if err != nil {
 		reply.Content = err.Error()
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -99,6 +99,14 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	// Assign role di server
 	ServerID := config.Get("ID_SERVER")
 	MemberRoleID := config.Get("ID_ROLE")
+	LifetimeRoleID := config.Get("ID_ROLE_LIFETIME")
+
+	role := ""
+	if payment.MonthCount >= 1000 {
+		role = LifetimeRoleID
+	}else{
+		role = MemberRoleID
+	}
 	
 	_, err = s.GuildMember(ServerID, *user.IDDiscord)
 	if err != nil {
@@ -111,7 +119,7 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	err = s.GuildMemberRoleAdd(ServerID, *user.IDDiscord, MemberRoleID)
+	err = s.GuildMemberRoleAdd(ServerID, *user.IDDiscord, role)
 	if err != nil {
 		fmt.Println("Gagal assign role 😢")
 		reply.Content = "Gagal assign role 😢"
@@ -139,6 +147,11 @@ func ModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			Data: reply,
 		})
 	}
+
+	NotifBerhasilAktivasiGroup(
+		username,
+		memberID,
+	)
 	
 	reply.Content = "Berhasil Menjadikanmu Member CryptoLabs Akademi ✨"
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -170,4 +183,65 @@ func getModalValue(i *discordgo.InteractionCreate, customID string) (string, err
 		}
 	}
 	return "", errors.New("modal input tidak ditemukan")
+}
+
+func NotifBerhasilAktivasiGroup(username, discordUserID string) {
+	botToken := config.Get("BOT_TOKEN")
+	notifChannel := config.Get("NOTIF_CHANNEL_ID")
+	serverID := config.Get("ID_SERVER")
+
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		log.Println("Gagal bikin session Discord:", err)
+		return
+	}
+
+	if err := dg.Open(); err != nil {
+		log.Println("Gagal buka session Discord:", err)
+		return
+	}
+	defer dg.Close()
+
+	// ==========================
+	// 1️⃣ NOTIF KE CHANNEL ADMIN
+	// ==========================
+	embed := &discordgo.MessageEmbed{
+		Title: "✅ Aktivasi Member Baru",
+		Description: fmt.Sprintf(
+			"👤 **User:** %s\n🆔 **Discord ID:** `%s`\n🏠 **Server:** %s\n\nStatus: **AKTIF 🚀**",
+			username,
+			discordUserID,
+			serverID,
+		),
+		Color:     0x00FF99,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+
+	_, err = dg.ChannelMessageSendComplex(
+		notifChannel,
+		&discordgo.MessageSend{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		},
+	)
+	if err != nil {
+		log.Println("Gagal kirim notif ke channel:", err)
+	}
+
+	// ==========================
+	// 2️⃣ JAPRI USER (DM)
+	// ==========================
+	dm, err := dg.UserChannelCreate(discordUserID)
+	if err != nil {
+		log.Println("Gagal buat DM channel:", err)
+		return
+	}
+
+	_, err = dg.ChannelMessageSend(dm.ID,
+		"🎉 **Aktivasi Berhasil!**\n\n"+
+			"Selamat, akun kamu sudah **resmi aktif** sebagai member **CryptoLabs Akademi** 🚀\n\n"+
+			"Kalau ada kendala atau pertanyaan, feel free buat chat admin ya 🔥",
+	)
+	if err != nil {
+		log.Println("Gagal kirim DM ke user:", err)
+	}
 }

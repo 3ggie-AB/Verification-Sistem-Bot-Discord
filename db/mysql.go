@@ -127,11 +127,11 @@ func UpdateUserDiscordID(userID uint, discordID string) error {
 		}).Error
 }
 
-func RedeemDiscordCode(code string, discordName string, discordID string) (*models.User, *models.DiscordCode, error) {
+func RedeemDiscordCode(code string, discordName string, discordID string) (*models.User, *models.DiscordCode, *models.Payment, error) {
 	var dcode models.DiscordCode
 	err := DB.Preload("Payment").Where("code = ? AND is_used = false", code).First(&dcode); 
 	if err.Error != nil {
-		return nil, nil, fmt.Errorf("Kode salah atau sudah digunakan :",err.Error)
+		return nil, nil, nil, fmt.Errorf("Kode salah atau sudah digunakan :",err.Error)
 	}
 
 	fmt.Println("Kodeku : ", dcode)
@@ -139,22 +139,22 @@ func RedeemDiscordCode(code string, discordName string, discordID string) (*mode
 	// ambil user via payment
 	var payment models.Payment
 	if err := DB.First(&payment, dcode.PaymentID).Error; err != nil {
-		return nil, nil, fmt.Errorf("Payment tidak ditemukan")
+		return nil, nil, nil, fmt.Errorf("Payment tidak ditemukan")
 	}
 
 	var user models.User
 	if err := DB.First(&user, payment.UserID).Error; err != nil {
-		return nil, nil, fmt.Errorf("User tidak ditemukan")
+		return nil, nil, nil, fmt.Errorf("User tidak ditemukan")
 	}
 	
 	fmt.Println("Mau cek Nama Discord Nih")
 
 	if discordName == "" {
-		return nil, nil, fmt.Errorf("Nama Discord wajib diisi")
+		return nil, nil, nil, fmt.Errorf("Nama Discord wajib diisi")
 	}
 
 	if discordID == "" {
-		return nil, nil, fmt.Errorf("ID Discord wajib diisi")
+		return nil, nil, nil, fmt.Errorf("ID Discord wajib diisi")
 	}
 
 	// update user dan discord code
@@ -170,8 +170,8 @@ func RedeemDiscordCode(code string, discordName string, discordID string) (*mode
 	}
 	user.MemberExpiredAt = &newExpiry
 	if err := DB.Save(&user).Error; err != nil {
-		return nil, nil, fmt.Errorf("Gagal update user")
+		return nil, nil, nil, fmt.Errorf("Gagal update user")
 	}
 
-	return &user, &dcode, nil
+	return &user, &dcode, &payment, nil
 }

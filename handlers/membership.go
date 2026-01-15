@@ -3,8 +3,11 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 	"crypto-member/db"
+	"crypto-member/config"
+	"github.com/bwmarrin/discordgo"
 	"crypto-member/models"
 	"fmt"
+	"os"
 	"strings"
 	"strconv"
 	"path/filepath"
@@ -12,6 +15,30 @@ import (
 	"time"
 	"math"
 )
+
+func formatRupiah(amount float64) string {
+    s := fmt.Sprintf("%.0f", amount) // tanpa desimal
+    n := len(s)
+    if n <= 3 {
+        return s
+    }
+
+    var parts []string
+    for n > 3 {
+        parts = append([]string{s[n-3 : n]}, parts...)
+        n -= 3
+    }
+    parts = append([]string{s[:n]}, parts...)
+    return strings.Join(parts, ".")
+}
+
+func mustOpenFile(path string) *os.File {
+    f, err := os.Open(path)
+    if err != nil {
+        panic(err)
+    }
+    return f
+}
 
 func pricePerMonth(monthCount int) float64 {
 	raw := 0.0
@@ -78,8 +105,13 @@ func CheckoutMembership(c *fiber.Ctx) error {
 	}
 
 	// === HITUNG PAYMENT ===
-	pricePerMonth := pricePerMonth(monthCount)
-	originalAmount := pricePerMonth * float64(monthCount)
+	var originalAmount float64
+	if monthCount >= 10000 {
+		pricePerMonth := pricePerMonth(monthCount)
+		originalAmount = pricePerMonth * float64(monthCount)
+	}else{
+		originalAmount = 2_500_000.0
+	}
 
 	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount)
 	if err != nil {
@@ -111,6 +143,46 @@ func CheckoutMembership(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Gagal membuat pembayaran",
 		})
+	}
+
+	botToken := config.Get("BOT_TOKEN")
+	notifChannel := config.Get("NOTIF_CHANNEL_ID")
+
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		fmt.Println("Gagal bikin session Discord:", err)
+	} else {
+		if err := dg.Open(); err != nil {
+			fmt.Println("Gagal buka session Discord:", err)
+		} else {
+			defer dg.Close()
+
+			f, err := os.Open(filename)
+			if err != nil {
+				fmt.Println("Gagal buka file bukti:", err)
+			} else {
+				defer f.Close()
+
+				embed := &discordgo.MessageEmbed{
+					Title: "💰 Checkout Membership Baru :",
+					Description: fmt.Sprintf(
+						"**Nama User : %s\nJumlah bulan: %d\nTotal: Rp %s**\n\nCek Bukti : https://cryptolabsakademi.site/%s",
+						user.Username, monthCount, formatRupiah(finalAmount), buktiPath,
+					),
+					Color:     0x00FF00,
+					Timestamp: time.Now().Format(time.RFC3339),
+				}
+
+				_, err = dg.ChannelMessageSendComplex(notifChannel, &discordgo.MessageSend{
+					Embeds: []*discordgo.MessageEmbed{embed},
+				})
+				if err != nil {
+					fmt.Println("Gagal kirim notif ke channel:", err)
+				} else {
+					fmt.Println("Notif sukses terkirim!")
+				}
+			}
+		}
 	}
 
 	return c.JSON(fiber.Map{

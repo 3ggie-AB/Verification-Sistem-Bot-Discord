@@ -45,10 +45,7 @@ func main() {
 func runCheck(dg *discordgo.Session) {
 	log.Println("Start expired check")
 
-	if err := service.CheckAndRemoveExpiredMembers(dg); err != nil {
-		log.Println("Error:", err)
-		return
-	}
+	service.CheckAndRemoveExpiredMembers(dg)
 
 	log.Println("Expired check done")
 }
