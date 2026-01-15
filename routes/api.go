@@ -38,6 +38,7 @@ func Register(app *fiber.App) {
 	api.Get("/payments", handlers.GetPayments)
 	api.Post("/payments/:id/approve", handlers.ApprovePayment)
 	api.Post("/payments/:id/reject", handlers.RejectPayment)
+	api.Delete("/payments/:id", handlers.DeletePayment)
 
 	coupon := api.Group("/coupons")
 	coupon.Get("/check", handlers.CheckCouponByCode)
@@ -52,4 +53,21 @@ func Register(app *fiber.App) {
 	users.Post("/", handlers.CreateUser)
 	users.Put("/:id", handlers.UpdateUser)
 	users.Delete("/:id", handlers.DeleteUser)
+
+	api.Get("/stream/:module_id", handlers.StreamModule)
+
+	moduleGroup := api.Group("/module-groups")
+	moduleGroup.Get("/", handlers.GetModuleGroups)
+	moduleGroup.Post("/", handlers.CreateModuleGroup)
+	moduleGroup.Put("/:id", handlers.UpdateModuleGroup)
+	moduleGroup.Delete("/:id", handlers.DeleteModuleGroup)
+
+	module := api.Group("/modules")
+	module.Get("/group/:group_id", handlers.GetModulesByGroup)
+	module.Post("/", handlers.CreateModule)
+	module.Put("/:id", handlers.UpdateModule)
+	module.Delete("/:id", handlers.DeleteModule)
+
+	progress := api.Group("/module-progress")
+	progress.Post("/", handlers.UpdateModuleProgress)
 }

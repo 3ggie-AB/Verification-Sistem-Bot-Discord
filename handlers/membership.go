@@ -106,7 +106,7 @@ func CheckoutMembership(c *fiber.Ctx) error {
 
 	// === HITUNG PAYMENT ===
 	var originalAmount float64
-	if monthCount >= 10000 {
+	if monthCount < 10000 {
 		pricePerMonth := pricePerMonth(monthCount)
 		originalAmount = pricePerMonth * float64(monthCount)
 	}else{

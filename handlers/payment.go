@@ -5,6 +5,7 @@ import (
 	"crypto-member/db"
 	"crypto-member/models"
 	"time"
+	"gorm.io/gorm"
 )
 
 func GetPayments(c *fiber.Ctx) error {
@@ -69,6 +70,11 @@ func ApprovePayment(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Gagal approve payment",
 		})
+	}
+
+	if payment.CouponID != nil {
+		db.DB.Model(&models.Coupon{}).Where("id = ?", *payment.CouponID).
+			UpdateColumn("used_count", gorm.Expr("used_count + ?", 1))
 	}
 
 	// generate discord code SETELAH PAID
@@ -137,5 +143,46 @@ func RejectPayment(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "Payment berhasil ditolak",
+	})
+}
+
+func DeletePayment(c *fiber.Ctx) error {
+	admin := c.Locals("user").(*models.User)
+
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "Akses ditolak",
+		})
+	}
+
+	paymentID := c.Params("id")
+
+	var payment models.Payment
+	if err := db.DB.First(&payment, paymentID).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{
+			"error": "Payment tidak ditemukan",
+		})
+	}
+
+	// ❗ safety: payment yang sudah paid tidak boleh dihapus
+	if payment.Status == "paid" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Payment yang sudah dibayar tidak boleh dihapus",
+		})
+	}
+
+	// hapus discord code kalau ada
+	db.DB.Where("payment_id = ?", payment.ID).
+		Delete(&models.DiscordCode{})
+
+	// hapus payment
+	if err := db.DB.Delete(&payment).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Gagal menghapus payment",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Payment berhasil dihapus",
 	})
 }

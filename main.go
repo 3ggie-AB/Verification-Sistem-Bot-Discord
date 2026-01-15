@@ -12,12 +12,15 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	
 	"time"
+	"log"
+	"github.com/bwmarrin/discordgo"
     "github.com/gofiber/fiber/v2/middleware/limiter"
 )
 
 func main() {
 	config.LoadEnv()
 	db.Connect()
+	go cronStart()
 
 	app := fiber.New(fiber.Config{
 		BodyLimit: 4 * 1024 * 1024,
@@ -88,4 +91,42 @@ func main() {
 	if err := app.Listen(":3000"); err != nil {
 		fmt.Println("Error starting Fiber:", err)
 	}
+}
+
+func cronStart() {
+	botToken := config.Get("BOT_TOKEN")
+	if botToken == "" {
+		log.Fatal("BOT_TOKEN kosong")
+	}
+
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = dg.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dg.Close()
+
+	log.Println("Discord connected")
+
+	// 🔥 RUN SEKALI SAAT START
+	runCheck(dg)
+
+	// ⏱️ LOOP CRON
+	interval := 4 * time.Hour
+	for {
+		time.Sleep(interval)
+		runCheck(dg)
+	}
+}
+
+func runCheck(dg *discordgo.Session) {
+	log.Println("Start expired check")
+
+	service.CheckAndRemoveExpiredMembers(dg)
+
+	log.Println("Expired check done")
 }

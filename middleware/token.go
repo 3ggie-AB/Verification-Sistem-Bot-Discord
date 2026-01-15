@@ -11,19 +11,19 @@ import (
 func AuthRequired(c *fiber.Ctx) error {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
-		return c.Status(401).JSON(fiber.Map{"error": "missing token"})
+		return c.Status(401).JSON(fiber.Map{"error": "Anda tidak Memiliki Sesi Login"})
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid token format"})
+		return c.Status(401).JSON(fiber.Map{"error": "Format Token Salah"})
 	}
 
 	token := parts[1]
 
 	var user models.User
 	if err := db.DB.Where("token = ?", token).First(&user).Error; err != nil {
-		return c.Status(401).JSON(fiber.Map{"error": "invalid token"})
+		return c.Status(401).JSON(fiber.Map{"error": "Sesi kamu sudah berakhir, Login ulang dulu ya biar bisa lanjut."})
 	}
 
 	c.Locals("user", &user) // simpan user di context
