@@ -10,7 +10,8 @@ import (
 func GetModuleGroups(c *fiber.Ctx) error {
 	var groups []models.ModuleGroup
 
-	if err := db.DB.Preload("Modules").
+	if err := db.DB.
+		// Preload("Modules").
 		Order("created_at DESC").
 		Find(&groups).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -58,6 +59,10 @@ func CreateModuleGroup(c *fiber.Ctx) error {
 
 func UpdateModuleGroup(c *fiber.Ctx) error {
 	id := c.Params("id")
+	admin := c.Locals("user").(*models.User)
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	}
 
 	var group models.ModuleGroup
 	if err := db.DB.First(&group, "id = ?", id).Error; err != nil {
@@ -87,6 +92,10 @@ func UpdateModuleGroup(c *fiber.Ctx) error {
 
 func DeleteModuleGroup(c *fiber.Ctx) error {
 	id := c.Params("id")
+	admin := c.Locals("user").(*models.User)
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	}
 
 	if err := db.DB.Delete(&models.ModuleGroup{}, "id = ?", id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal hapus module group"})

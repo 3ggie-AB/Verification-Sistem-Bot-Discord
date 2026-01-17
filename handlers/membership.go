@@ -106,11 +106,23 @@ func CheckoutMembership(c *fiber.Ctx) error {
 
 	// === HITUNG PAYMENT ===
 	var originalAmount float64
-	if monthCount < 10000 {
-		pricePerMonth := pricePerMonth(monthCount)
-		originalAmount = pricePerMonth * float64(monthCount)
-	}else{
-		originalAmount = 2_500_000.0
+
+	if isAturanDBEnabled() {
+		amount, err := priceFromDB(monthCount)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": err.Error(),
+			})
+		}
+		originalAmount = amount
+	} else {
+		// fallback hardcode
+		if monthCount < 10000 {
+			ppm := pricePerMonth(monthCount)
+			originalAmount = ppm * float64(monthCount)
+		} else {
+			originalAmount = 2_500_000.0
+		}
 	}
 
 	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount)

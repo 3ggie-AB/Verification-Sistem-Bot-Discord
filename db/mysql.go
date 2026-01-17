@@ -70,6 +70,11 @@ func Connect() {
 		&models.DiscordCode{},
 		&models.Payment{},
 		&models.Coupon{},
+		&models.ModuleGroup{},
+		&models.Module{},
+		&models.ModuleProgress{},
+		&models.RulePricing{},
+		&models.Expense{},
 	)
 	if err != nil {
 		log.Fatal("❌ AutoMigrate failed:", err)
@@ -77,6 +82,7 @@ func Connect() {
 
 	log.Println("✅ Database migrated successfully")
 	CreateDefaultAdmin()
+	SeedRulePricing()
 }
 
 // Buat default admin kalau belum ada
@@ -174,4 +180,47 @@ func RedeemDiscordCode(code string, discordName string, discordID string) (*mode
 	}
 
 	return &user, &dcode, &payment, nil
+}
+
+func SeedRulePricing() {
+	// Hapus semua data lama
+	// if err := DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&models.RulePricing{}).Error; err != nil {
+	// 	log.Printf("Failed to clear RulePricing: %v", err)
+	// 	return
+	// }
+	// log.Println("Semua data RulePricing dihapus ✅")
+
+	var count int64
+
+	if err := DB.Model(&models.RulePricing{}).
+		Where("is_active = ?", true).
+		Count(&count).Error; err != nil {
+		log.Printf("Failed to check active RulePricing: %v", err)
+		return
+	}
+
+	if count > 0 {
+		log.Println("RulePricing aktif sudah ada, skip seeding ⏭️")
+		return
+	}
+
+	pricings := []models.RulePricing{
+		{MinMonth: 1, MaxMonth: intPtr(2), TotalPrice: 200_000, IsActive: true},
+		{MinMonth: 3, MaxMonth: intPtr(5), TotalPrice: 550_000, IsActive: true},
+		{MinMonth: 6, MaxMonth: intPtr(11), TotalPrice: 1_000_000, IsActive: true},
+		{MinMonth: 12, MaxMonth: intPtr(999), TotalPrice: 1_800_000, IsActive: true},
+		{MinMonth: 1000, MaxMonth: intPtr(9999), TotalPrice: 2_500_000, IsActive: true},
+	}
+
+	for _, p := range pricings {
+		if err := DB.Create(&p).Error; err != nil {
+			log.Printf("Failed to seed RulePricing: %v", err)
+		}
+	}
+
+	log.Println("Seeder RulePricing selesai ✅")
+}
+
+func intPtr(i int) *int {
+	return &i
 }

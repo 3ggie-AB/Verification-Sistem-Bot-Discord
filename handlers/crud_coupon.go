@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+func mustAdmin(c *fiber.Ctx) (*models.User, error) {
+	user := c.Locals("user").(*models.User)
+	if user.Role != "admin" {
+		return nil, fiber.NewError(403, "Akses ditolak")
+	}
+	return user, nil
+}
+
 func GetCoupons(c *fiber.Ctx) error {
 	admin := c.Locals("user").(*models.User)
 	if admin.Role != "admin" {
@@ -37,19 +45,19 @@ func GetCouponByID(c *fiber.Ctx) error {
 }
 
 func CreateCoupon(c *fiber.Ctx) error {
-	admin := c.Locals("user").(*models.User)
-	if admin.Role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	if _, err := mustAdmin(c); err != nil {
+		return err
 	}
 
 	type req struct {
 		Code        string   `json:"code"`
-		Type        string   `json:"type"` // percent | fixed
+		Type        string   `json:"type"`
 		Value       float64  `json:"value"`
-		MaxDiscount *float64 `json:"max_discount"` // optional
+		MaxDiscount *float64 `json:"max_discount"`
 		Quota       uint     `json:"quota"`
-		ExpiredAt   *string  `json:"expired_at"` // optional, format "YYYY-MM-DD"
-		IsActive    *bool    `json:"is_active"`  // optional, default true
+		Trigger     *string  `json:"trigger"`     // 🔥
+		ExpiredAt   *string  `json:"expired_at"`
+		IsActive    *bool    `json:"is_active"`
 	}
 
 	var body req
@@ -57,16 +65,16 @@ func CreateCoupon(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "Request tidak valid"})
 	}
 
-	// validasi wajib
-	if body.Code == "" || !(body.Type == "percent" || body.Type == "fixed") || body.Value <= 0 || body.Quota == 0 {
-		return c.Status(400).JSON(fiber.Map{"error": "Field code, type, value, quota wajib diisi dan valid"})
+	if body.Code == "" || body.Value <= 0 || body.Quota == 0 ||
+		(body.Type != "percent" && body.Type != "fixed") {
+		return c.Status(400).JSON(fiber.Map{"error": "Field wajib tidak valid"})
 	}
 
 	var expiredAt *time.Time
-	if body.ExpiredAt != nil && *body.ExpiredAt != "" {
+	if body.ExpiredAt != nil {
 		t, err := time.Parse("2006-01-02", *body.ExpiredAt)
 		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Format expired_at salah, gunakan YYYY-MM-DD"})
+			return c.Status(400).JSON(fiber.Map{"error": "Format expired_at salah"})
 		}
 		expiredAt = &t
 	}
@@ -82,9 +90,9 @@ func CreateCoupon(c *fiber.Ctx) error {
 		Value:       body.Value,
 		MaxDiscount: body.MaxDiscount,
 		Quota:       body.Quota,
-		UsedCount:   0,
-		ExpiredAt:   expiredAt,
+		Trigger:     body.Trigger, // 🔥
 		IsActive:    isActive,
+		ExpiredAt:   expiredAt,
 		CreatedAt:   time.Now(),
 	}
 
@@ -92,16 +100,12 @@ func CreateCoupon(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal membuat coupon"})
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Coupon berhasil dibuat",
-		"coupon":  coupon,
-	})
+	return c.JSON(fiber.Map{"message": "Coupon berhasil dibuat", "coupon": coupon})
 }
 
 func UpdateCoupon(c *fiber.Ctx) error {
-	admin := c.Locals("user").(*models.User)
-	if admin.Role != "admin" {
-		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	if _, err := mustAdmin(c); err != nil {
+		return err
 	}
 
 	id := c.Params("id")
@@ -116,6 +120,7 @@ func UpdateCoupon(c *fiber.Ctx) error {
 		Value       *float64 `json:"value"`
 		MaxDiscount *float64 `json:"max_discount"`
 		Quota       *uint    `json:"quota"`
+		Trigger     *string  `json:"trigger"` // 🔥
 		ExpiredAt   *string  `json:"expired_at"`
 		IsActive    *bool    `json:"is_active"`
 	}
@@ -126,13 +131,14 @@ func UpdateCoupon(c *fiber.Ctx) error {
 	}
 
 	updates := map[string]interface{}{}
+
 	if body.Code != nil {
 		updates["code"] = *body.Code
 	}
-	if body.Type != nil && (*body.Type == "percent" || *body.Type == "fixed") {
+	if body.Type != nil {
 		updates["type"] = *body.Type
 	}
-	if body.Value != nil && *body.Value > 0 {
+	if body.Value != nil {
 		updates["value"] = *body.Value
 	}
 	if body.MaxDiscount != nil {
@@ -140,6 +146,9 @@ func UpdateCoupon(c *fiber.Ctx) error {
 	}
 	if body.Quota != nil {
 		updates["quota"] = *body.Quota
+	}
+	if body.Trigger != nil {
+		updates["trigger"] = body.Trigger // 🔥
 	}
 	if body.ExpiredAt != nil {
 		t, err := time.Parse("2006-01-02", *body.ExpiredAt)
@@ -156,7 +165,7 @@ func UpdateCoupon(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal update coupon"})
 	}
 
-	return c.JSON(fiber.Map{"message": "Coupon berhasil diupdate", "coupon": coupon})
+	return c.JSON(fiber.Map{"message": "Coupon berhasil diupdate"})
 }
 
 func DeleteCoupon(c *fiber.Ctx) error {

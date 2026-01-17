@@ -31,7 +31,7 @@ func StreamModule(c *fiber.Ctx) error {
 	}
 
 	// 3. return embed url
-	embedURL := "https://www.youtube.com/embed/" + module.YoutubeID + "?enablejsapi=1"
+	embedURL := "https://www.youtube.com/embed/" + module.YoutubeID + "?controls=1&modestbranding=1&rel=0&showinfo=0&enablejsapi=1"
 
 	return c.JSON(fiber.Map{
 		"title":     module.Title,

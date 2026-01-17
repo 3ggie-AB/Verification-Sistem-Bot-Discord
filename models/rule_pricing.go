@@ -4,7 +4,6 @@ import (
 	"time"
 )
 
-
 type RulePricing struct {
 	ID uint `gorm:"primaryKey"`
 

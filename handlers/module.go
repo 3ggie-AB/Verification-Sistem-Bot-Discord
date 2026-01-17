@@ -9,21 +9,63 @@ import (
 	"github.com/google/uuid"
 )
 
+type ModuleGroupResponse struct {
+	ID          uuid.UUID
+	Title       string
+	Description *string
+	IsActive    bool
+	Modules     []ModuleResponse
+}
+
+type ModuleResponse struct {
+	ID            uuid.UUID
+	ModuleGroupID uuid.UUID
+	Title         string
+	Description   *string
+}
+
 func GetModulesByGroup(c *fiber.Ctx) error {
 	groupID := c.Params("group_id")
 
-	var modules []models.Module
+	var group models.ModuleGroup
 	if err := db.DB.
-		Where("module_group_id = ? AND is_active = ?", groupID, true).
-		Order("published_at ASC").
-		Find(&modules).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Gagal ambil module"})
+		Preload("Modules").
+		Where("id = ?", groupID).
+		First(&group).Error; err != nil {
+
+		return c.Status(500).JSON(fiber.Map{
+			"error": "Gagal ambil module group",
+		})
 	}
 
-	return c.JSON(fiber.Map{"data": modules})
+	// mapping ke DTO
+	res := ModuleGroupResponse{
+		ID:          group.ID,
+		Title:       group.Title,
+		Description: group.Description,
+		IsActive:    group.IsActive,
+		Modules:     []ModuleResponse{},
+	}
+
+	for _, m := range group.Modules {
+		res.Modules = append(res.Modules, ModuleResponse{
+			ID:            m.ID,
+			ModuleGroupID: m.ModuleGroupID,
+			Title:         m.Title,
+			Description:   m.Description,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"data": res,
+	})
 }
 
 func CreateModule(c *fiber.Ctx) error {
+	admin := c.Locals("user").(*models.User)
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	}
 	var body struct {
 		ModuleGroupID string  `json:"module_group_id"`
 		Title         string  `json:"title"`
@@ -55,6 +97,10 @@ func CreateModule(c *fiber.Ctx) error {
 }
 
 func UpdateModule(c *fiber.Ctx) error {
+	admin := c.Locals("user").(*models.User)
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	}
 	id := c.Params("id")
 
 	var module models.Module
@@ -79,6 +125,10 @@ func UpdateModule(c *fiber.Ctx) error {
 }
 
 func DeleteModule(c *fiber.Ctx) error {
+	admin := c.Locals("user").(*models.User)
+	if admin.Role != "admin" {
+		return c.Status(403).JSON(fiber.Map{"error": "Akses ditolak"})
+	}
 	id := c.Params("id")
 
 	if err := db.DB.Delete(&models.Module{}, "id = ?", id).Error; err != nil {

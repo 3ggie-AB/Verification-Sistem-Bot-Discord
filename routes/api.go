@@ -33,6 +33,13 @@ func Register(app *fiber.App) {
     api.Put("/update-profile", handlers.UpdateProfile)
     api.Get("/me", handlers.Me)
 
+	api.Get("/membership/pricing", handlers.GetMembershipPricing)
+	api.Post("/rule-pricing", handlers.CreateRulePricing)
+	api.Get("/rule-pricing", handlers.GetAllRulePricing)
+	api.Get("/rule-pricing/:id", handlers.GetRulePricingByID)
+	api.Put("/rule-pricing/:id", handlers.UpdateRulePricing)
+	api.Delete("/rule-pricing/:id", handlers.DeleteRulePricing)
+
 	api.Post("/checkout", handlers.CheckoutMembership)
 
 	api.Get("/payments", handlers.GetPayments)
@@ -67,6 +74,13 @@ func Register(app *fiber.App) {
 	module.Post("/", handlers.CreateModule)
 	module.Put("/:id", handlers.UpdateModule)
 	module.Delete("/:id", handlers.DeleteModule)
+
+	expense := api.Group("/expenses")
+	expense.Post("/", handlers.CreateExpense)
+	expense.Get("/", handlers.GetExpenses)
+	expense.Get("/:id", handlers.GetExpenseByID)
+	expense.Put("/:id", handlers.UpdateExpense)
+	expense.Delete("/:id", handlers.DeleteExpense) 
 
 	progress := api.Group("/module-progress")
 	progress.Post("/", handlers.UpdateModuleProgress)

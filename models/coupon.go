@@ -10,6 +10,7 @@ type Coupon struct {
 	MaxDiscount  *float64  // optional (buat percent)
 	Quota        uint      // berapa kali bisa dipakai
 	UsedCount    uint
+	Trigger      *string
 	ExpiredAt    *time.Time
 	IsActive     bool
 	CreatedAt    time.Time
