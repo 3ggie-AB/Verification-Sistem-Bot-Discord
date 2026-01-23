@@ -5,13 +5,28 @@ import (
 
 	"crypto-member/db"
 	"crypto-member/models"
+	"time"
 )
 
 func GetModuleGroups(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	now := time.Now()
+
+	areMemberActive := true
+	if user.Role != "admin" && (user.MemberExpiredAt == nil || user.MemberExpiredAt.Before(now)) {
+		areMemberActive = false
+	}
+
 	var groups []models.ModuleGroup
 
 	if err := db.DB.
 		// Preload("Modules").
+		Where(func(db *fiber.Ctx) string {
+			if !areMemberActive {
+				return "for_member = false"
+			}
+			return "1 = 1"
+		}(c)).
 		Order("created_at DESC").
 		Find(&groups).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{
@@ -32,9 +47,10 @@ func CreateModuleGroup(c *fiber.Ctx) error {
 	}
 
 	var body struct {
-		Title       string  `json:"title"`
-		Description *string `json:"description"`
-		IsActive    bool    `json:"is_active"`
+		Title       string 
+		Description *string
+		IsActive    bool
+		ForMember   bool
 	}
 
 	if err := c.BodyParser(&body); err != nil || body.Title == "" {
@@ -45,6 +61,7 @@ func CreateModuleGroup(c *fiber.Ctx) error {
 		Title:       body.Title,
 		Description: body.Description,
 		IsActive:    body.IsActive,
+		ForMember:   body.ForMember,
 	}
 
 	if err := db.DB.Create(&group).Error; err != nil {
@@ -70,9 +87,10 @@ func UpdateModuleGroup(c *fiber.Ctx) error {
 	}
 
 	var body struct {
-		Title       string  `json:"title"`
-		Description *string `json:"description"`
-		IsActive    bool    `json:"is_active"`
+		Title       string
+		Description *string
+		IsActive    bool
+		ForMember   bool
 	}
 
 	if err := c.BodyParser(&body); err != nil {
@@ -82,6 +100,7 @@ func UpdateModuleGroup(c *fiber.Ctx) error {
 	group.Title = body.Title
 	group.Description = body.Description
 	group.IsActive = body.IsActive
+	group.ForMember = body.ForMember
 
 	db.DB.Save(&group)
 

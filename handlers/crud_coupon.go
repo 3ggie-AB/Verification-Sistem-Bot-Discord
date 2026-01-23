@@ -5,6 +5,8 @@ import (
 	"crypto-member/db"
 	"crypto-member/models"
 	"time"
+	"strconv"
+	"fmt"
 )
 
 func mustAdmin(c *fiber.Ctx) (*models.User, error) {
@@ -58,6 +60,7 @@ func CreateCoupon(c *fiber.Ctx) error {
 		Trigger     *string  `json:"trigger"`     // 🔥
 		ExpiredAt   *string  `json:"expired_at"`
 		IsActive    *bool    `json:"is_active"`
+		MinMonth    *uint    `json:"min_month"`
 	}
 
 	var body req
@@ -84,6 +87,11 @@ func CreateCoupon(c *fiber.Ctx) error {
 		isActive = *body.IsActive
 	}
 
+	minMonth := uint(0)
+	if body.MinMonth != nil {
+		minMonth = *body.MinMonth
+	}
+
 	coupon := models.Coupon{
 		Code:        body.Code,
 		Type:        body.Type,
@@ -92,6 +100,7 @@ func CreateCoupon(c *fiber.Ctx) error {
 		Quota:       body.Quota,
 		Trigger:     body.Trigger, // 🔥
 		IsActive:    isActive,
+		MinMonth:    minMonth,
 		ExpiredAt:   expiredAt,
 		CreatedAt:   time.Now(),
 	}
@@ -123,6 +132,7 @@ func UpdateCoupon(c *fiber.Ctx) error {
 		Trigger     *string  `json:"trigger"` // 🔥
 		ExpiredAt   *string  `json:"expired_at"`
 		IsActive    *bool    `json:"is_active"`
+	    MinMonth    *uint    `json:"min_month"`
 	}
 
 	var body req
@@ -160,6 +170,9 @@ func UpdateCoupon(c *fiber.Ctx) error {
 	if body.IsActive != nil {
 		updates["is_active"] = *body.IsActive
 	}
+	if body.MinMonth != nil {
+		updates["min_month"] = *body.MinMonth
+	}
 
 	if err := db.DB.Model(&coupon).Updates(updates).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Gagal update coupon"})
@@ -190,6 +203,20 @@ func CheckCouponByCode(c *fiber.Ctx) error {
 		})
 	}
 
+	monthStr := c.Query("month")
+	if monthStr == "" {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Bulan wajib diisi",
+		})
+	}
+
+	monthInt, err := strconv.Atoi(monthStr)
+	if err != nil || monthInt < 0 {
+		return c.Status(400).JSON(fiber.Map{
+			"error": "Bulan harus berupa angka",
+		})
+	}
+
 	var coupon models.Coupon
 	if err := db.DB.Where("code = ?", code).First(&coupon).Error; err != nil {
 		return c.Status(404).JSON(fiber.Map{
@@ -203,6 +230,17 @@ func CheckCouponByCode(c *fiber.Ctx) error {
 	if !coupon.IsActive {
 		return c.Status(400).JSON(fiber.Map{
 			"error": "Coupon tidak aktif",
+		})
+	}
+
+	month := uint(monthInt)
+	if coupon.MinMonth > 0 && month < coupon.MinMonth {
+		textBulan := fmt.Sprintf("%d Bulan", month)
+		if month >= 1000 {
+			textBulan = "Lifetime"
+		}
+		return c.Status(400).JSON(fiber.Map{
+			"error": fmt.Sprintf("Coupon ini tidak bisa di Gunakan minimal Berlangganan %s", textBulan),
 		})
 	}
 

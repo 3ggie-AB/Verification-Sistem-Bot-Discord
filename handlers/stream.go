@@ -24,7 +24,7 @@ func StreamModule(c *fiber.Ctx) error {
 
 	// 2. cek membership
 	now := time.Now()
-	if user.MemberExpiredAt == nil || user.MemberExpiredAt.Before(now) {
+	if user.Role != "admin" && (user.MemberExpiredAt == nil || user.MemberExpiredAt.Before(now)) {
 		return c.Status(403).JSON(fiber.Map{
 			"error": "Membership tidak aktif",
 		})

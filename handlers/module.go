@@ -7,6 +7,8 @@ import (
 	"crypto-member/models"
 
 	"github.com/google/uuid"
+	"time"
+	"gorm.io/gorm"
 )
 
 type ModuleGroupResponse struct {
@@ -14,6 +16,7 @@ type ModuleGroupResponse struct {
 	Title       string
 	Description *string
 	IsActive    bool
+	ForMember   bool
 	Modules     []ModuleResponse
 }
 
@@ -22,17 +25,41 @@ type ModuleResponse struct {
 	ModuleGroupID uuid.UUID
 	Title         string
 	Description   *string
+	YoutubeID     string
+	ForMember     bool
 }
 
 func GetModulesByGroup(c *fiber.Ctx) error {
+	user := c.Locals("user").(*models.User)
+	now := time.Now()
+	isAdmin := user.Role == "admin"
+
+	areMemberActive := true
+	if user.Role != "admin" && (user.MemberExpiredAt == nil || user.MemberExpiredAt.Before(now)) {
+		areMemberActive = false
+	}
+
 	groupID := c.Params("group_id")
 
 	var group models.ModuleGroup
-	if err := db.DB.
-		Preload("Modules").
-		Where("id = ?", groupID).
-		First(&group).Error; err != nil {
 
+	query := db.DB.
+		Where("id = ?", groupID)
+
+	// Filter group kalau bukan member
+	if !areMemberActive {
+		query = query.Where("for_member = ?", false)
+	}
+
+	// Preload modules + filter modules juga
+	query = query.Preload("Modules", func(db *gorm.DB) *gorm.DB {
+		if !areMemberActive {
+			return db.Where("for_member = ?", false)
+		}
+		return db
+	})
+
+	if err := query.First(&group).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{
 			"error": "Gagal ambil module group",
 		})
@@ -44,16 +71,25 @@ func GetModulesByGroup(c *fiber.Ctx) error {
 		Title:       group.Title,
 		Description: group.Description,
 		IsActive:    group.IsActive,
+		ForMember:   group.ForMember,
 		Modules:     []ModuleResponse{},
 	}
 
 	for _, m := range group.Modules {
-		res.Modules = append(res.Modules, ModuleResponse{
+		moduleRes := ModuleResponse{
 			ID:            m.ID,
 			ModuleGroupID: m.ModuleGroupID,
 			Title:         m.Title,
 			Description:   m.Description,
-		})
+			ForMember:     m.ForMember,
+		}
+
+		// 🔐 hanya admin yang dapat youtube_id
+		if isAdmin {
+			moduleRes.YoutubeID = m.YoutubeID
+		}
+
+		res.Modules = append(res.Modules, moduleRes)
 	}
 
 	return c.JSON(fiber.Map{
@@ -72,6 +108,7 @@ func CreateModule(c *fiber.Ctx) error {
 		Description   *string `json:"description"`
 		YoutubeID     string  `json:"youtube_id"`
 		IsActive      bool    `json:"is_active"`
+		ForMember     bool    `json:"for_member"`
 	}
 
 	if err := c.BodyParser(&body); err != nil {
@@ -84,6 +121,7 @@ func CreateModule(c *fiber.Ctx) error {
 		Description:   body.Description,
 		YoutubeID:     body.YoutubeID,
 		IsActive:      body.IsActive,
+		ForMember:     body.ForMember,
 	}
 
 	if err := db.DB.Create(&module).Error; err != nil {
@@ -113,6 +151,7 @@ func UpdateModule(c *fiber.Ctx) error {
 		Description *string `json:"description"`
 		YoutubeID   string  `json:"youtube_id"`
 		IsActive    bool    `json:"is_active"`
+		ForMember   bool    `json:"for_member"`
 	}
 
 	c.BodyParser(&body)

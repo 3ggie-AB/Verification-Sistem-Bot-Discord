@@ -125,7 +125,7 @@ func CheckoutMembership(c *fiber.Ctx) error {
 		}
 	}
 
-	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount)
+	finalAmount, coupon, err := applyCoupon(couponCode, originalAmount, uint(monthCount))
 	if err != nil {
 		return c.Status(400).JSON(fiber.Map{
 			"error": err.Error(),
@@ -234,7 +234,7 @@ func generateUniqueDiscordCode() string {
 	}
 }
 
-func applyCoupon(code string, amount float64) (float64, *models.Coupon, error) {
+func applyCoupon(code string, amount float64, month uint) (float64, *models.Coupon, error) {
 	if code == "" {
 		return amount, nil, nil
 	}
@@ -252,6 +252,14 @@ func applyCoupon(code string, amount float64) (float64, *models.Coupon, error) {
 
 	if coupon.UsedCount >= coupon.Quota {
 		return amount, nil, fmt.Errorf("Coupon sudah habis")
+	}
+
+	if month < coupon.MinMonth {
+		textBulan := fmt.Sprintf("%d Bulan", month)
+		if month >= 1000 {
+			textBulan = "Lifetime"
+		}
+		return amount, nil, fmt.Errorf("Coupon ini tidak bisa di Gunakan minimal Berlangganan %s", textBulan)
 	}
 
 	discount := 0.0
@@ -272,4 +280,3 @@ func applyCoupon(code string, amount float64) (float64, *models.Coupon, error) {
 
 	return finalAmount, &coupon, nil
 }
-

@@ -12,6 +12,7 @@ type ModuleGroup struct {
 	Title       string     `gorm:"not null"`
 	Description *string
 	IsActive    bool       `gorm:"default:true"`
+	ForMember   bool       `gorm:"default:true"`
 
 	Modules []Module `gorm:"foreignKey:ModuleGroupID;constraint:OnDelete:CASCADE"`
 
@@ -36,6 +37,8 @@ type Module struct {
 	YoutubeID   string     `gorm:"not null"`
 	IsActive    bool       `gorm:"default:true"`
 	PublishedAt *time.Time
+
+	ForMember   bool       `gorm:"default:true"`
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

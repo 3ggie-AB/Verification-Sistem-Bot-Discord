@@ -22,6 +22,12 @@ func main() {
 	db.Connect()
 	go cronStart()
 
+	port := config.Get("APP_PORT")
+	if port == "" {
+		port = "3001"
+	}
+
+
 	app := fiber.New(fiber.Config{
 		BodyLimit: 4 * 1024 * 1024,
 	})
@@ -88,7 +94,8 @@ func main() {
 	fmt.Println("Bot is running...")
 
 	// Jalankan API
-	if err := app.Listen(":3000"); err != nil {
+	addr := ":" + port
+	if err := app.Listen(addr); err != nil {
 		fmt.Println("Error starting Fiber:", err)
 	}
 }

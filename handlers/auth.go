@@ -152,8 +152,26 @@ func UpdateProfile(c *fiber.Ctx) error {
 	return c.JSON(user)
 }
 
+type UserResponse struct {
+	models.User
+	MembershipStatus string `json:"membershipStatus"`
+}
+
 func Me(c *fiber.Ctx) error {
-	user := c.Locals("user").(*models.User)
+	authUser := c.Locals("user").(*models.User)
+
+	var user models.User
+	db.DB.First(&user, authUser.ID)
+
+	status := "inactive"
+	if user.MemberExpiredAt != nil && user.MemberExpiredAt.After(time.Now()) {
+		status = "active"
+	}
+
 	user.Password = ""
-	return c.JSON(user)
+
+	return c.JSON(UserResponse{
+		User: user,
+		MembershipStatus: status,
+	})
 }

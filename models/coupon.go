@@ -13,5 +13,6 @@ type Coupon struct {
 	Trigger      *string
 	ExpiredAt    *time.Time
 	IsActive     bool
+	MinMonth     uint     `gorm:"default:0"`
 	CreatedAt    time.Time
 }
