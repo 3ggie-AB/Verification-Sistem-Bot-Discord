@@ -6,6 +6,7 @@ import (
 	"crypto-member/service"
 	"crypto-member/db"
 	"crypto-member/routes"
+	"crypto-member/loopers"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -21,6 +22,13 @@ func main() {
 	config.LoadEnv()
 	db.Connect()
 	go cronStart()
+	startBotNews()
+
+	KeyNews := config.Get("THENEWSTOKEN")
+	if KeyNews == "" {
+		KeyNews = "THENEWSTOKEN"
+	}
+	go loopers.SaveCryptoNewsLoop(KeyNews)
 
 	port := config.Get("APP_PORT")
 	if port == "" {
@@ -98,6 +106,23 @@ func main() {
 	if err := app.Listen(addr); err != nil {
 		fmt.Println("Error starting Fiber:", err)
 	}
+}
+
+func startBotNews() {
+	botToken := config.Get("NEWS_BOT_TOKEN")
+	channelID := config.Get("NEWS_DISCORD_CHANNEL_ID")
+	dg, err := discordgo.New("Bot " + botToken)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = dg.Open()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer dg.Close()
+
+	go service.SendNewsToDiscord(dg, channelID)
 }
 
 func cronStart() {
