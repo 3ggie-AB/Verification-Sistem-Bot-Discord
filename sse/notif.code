@@ -1,0 +1,13 @@
+notif := models.Notification{
+	ID: "uuid",
+	Title: "Maintenance",
+	Message: "Server akan maintenance",
+	Type: "info",
+}
+
+db.Create(&notif)
+
+services.SendNotification(notif)
+
+
+// Contoh Implementasi Notif

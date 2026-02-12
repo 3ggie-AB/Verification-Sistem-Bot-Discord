@@ -14,6 +14,7 @@ func RoueteApi(api fiber.Router) {
 	api.Use(middleware.AuthRequired)
     api.Put("/update-profile", handlers.UpdateProfile)
     api.Get("/me", handlers.Me)
+    api.Get("/notif", handlers.SSEHandler)
 
 	api.Get("/membership/pricing", handlers.GetMembershipPricing)
 	api.Post("/rule-pricing", handlers.CreateRulePricing)

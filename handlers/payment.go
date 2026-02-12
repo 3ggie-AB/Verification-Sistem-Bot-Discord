@@ -4,6 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"crypto-member/db"
 	"crypto-member/models"
+	"crypto-member/service"
 	"time"
 	"gorm.io/gorm"
 )
@@ -90,6 +91,15 @@ func ApprovePayment(c *fiber.Ctx) error {
 			"error": "Gagal membuat Discord Code",
 		})
 	}
+
+	notif := models.Notification{
+		Title: "Pembayaran Berhasil",
+		Message: "Pembayaran Anda sudah di Konfirmasi Admin",
+		Type: "success",
+		UserID: &payment.UserID,
+	}
+	db.DB.Create(&notif)
+	service.SendNotification(notif)
 
 	return c.JSON(fiber.Map{
 		"message": "Payment berhasil di-approve",
