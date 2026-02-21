@@ -76,6 +76,9 @@ func Connect() {
 		&models.RulePricing{},
 		&models.Expense{},
 		&models.CryptoNews{},
+		&models.Announcement{},
+		&models.AutoMessager{},
+		&models.Notification{},
 	)
 	if err != nil {
 		log.Fatal("❌ AutoMigrate failed:", err)
