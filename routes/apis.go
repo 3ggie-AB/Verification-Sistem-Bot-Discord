@@ -65,6 +65,9 @@ func RoueteApi(api fiber.Router) {
 	expense.Put("/:id", handlers.UpdateExpense)
 	expense.Delete("/:id", handlers.DeleteExpense) 
 
+	api.Post("/announcements", handlers.CreateAnnouncement)
+	api.Get("/announcements", handlers.GetAllAnnouncements)
+
 	progress := api.Group("/module-progress")
 	progress.Post("/", handlers.UpdateModuleProgress)
 }

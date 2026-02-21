@@ -29,12 +29,12 @@ func main() {
 		KeyNews = "THENEWSTOKEN"
 	}
 	go loopers.SaveCryptoNewsLoop(KeyNews)
+	go service.InitDiscord()
 
 	port := config.Get("APP_PORT")
 	if port == "" {
 		port = "3001"
 	}
-
 
 	app := fiber.New(fiber.Config{
 		BodyLimit: 4 * 1024 * 1024,
