@@ -1,138 +1,132 @@
 package loopers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
-	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"crypto-member/db"
 	"crypto-member/models"
 
-	"github.com/PuerkitoBio/goquery"
 	"gorm.io/gorm/clause"
 )
 
-// translateText pake MyMemory
-func translateText(text string) (string, error) {
-	if text == "" {
-		return "", nil
+func summarizeWithGroq(apiKey string, articleURL string, context string) (string, error) {
+	endpoint := "https://api.groq.com/openai/v1/chat/completions"
+
+	prompt := fmt.Sprintf(`Anda adalah analis berita keuangan profesional.
+
+Baca artikel dari URL berikut dan buat ringkasan dalam Bahasa Indonesia yang ringkas, jelas, dan objektif.
+
+URL: %s
+
+Tambahan Konteks dari saya :
+%s
+
+Instruksi:
+- Tulis ringkasan utama (3-8 kalimat)
+- Fokus pada poin penting
+- Gunakan bahasa Indonesia yang mudah dipahami
+- Jangan mencantumkan opini pribadi
+- Jangan menyertakan tautan
+
+Output hanya isi ringkasan.`, articleURL, context)
+
+	payload := map[string]interface{}{
+		"model": "openai/gpt-oss-120b",
+		"messages": []map[string]string{
+			{
+				"role":    "user",
+				"content": prompt,
+			},
+		},
+		"temperature": 0.3,
 	}
 
-	encodedText := url.QueryEscape(text)
-	apiURL := fmt.Sprintf("https://api.mymemory.translated.net/get?q=%s&langpair=en|id", encodedText)
+	jsonData, _ := json.Marshal(payload)
 
-	resp, err := http.Get(apiURL)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("groq error: %s", string(bodyBytes))
+	}
+
 	var result struct {
-		ResponseData struct {
-			TranslatedText string `json:"translatedText"`
-		} `json:"responseData"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 
 	if err := json.Unmarshal(bodyBytes, &result); err != nil {
 		return "", err
 	}
 
-	return result.ResponseData.TranslatedText, nil
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("no response from Groq")
+	}
+
+	return strings.TrimSpace(result.Choices[0].Message.Content), nil
 }
 
-// fetchFullContent scrape full article content
-func fetchFullContent(articleURL string) (string, error) {
-	res, err := http.Get(articleURL)
+func SaveArticleWithGroq(article models.CryptoNews, groqAPIKey string) error {
+
+	summary, err := summarizeWithGroq(groqAPIKey, article.URL, article.Description)
 	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != 200 {
-		return "", fmt.Errorf("failed to fetch URL: %s, status: %d", articleURL, res.StatusCode)
+		log.Println("Groq summarize failed:", err)
+		return err
 	}
 
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		return "", err
-	}
+	article.ContentIndo = summary
 
-	var paragraphs []string
-	doc.Find("p").Each(func(i int, s *goquery.Selection) {
-		text := strings.TrimSpace(s.Text())
-		if text != "" {
-			paragraphs = append(paragraphs, text)
-		}
-	})
-
-	content := strings.Join(paragraphs, "\n\n")
-	return content, nil
+	return db.DB.
+		Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&article).Error
 }
 
-// Translate batch supaya gak kena limit MyMemory
-func translateFullContent(text string) string {
-	if text == "" {
-		return ""
+func SaveCryptoNewsLoop(newsAPIKey string) {
+
+	groqAPIKey := os.Getenv("GROQ_API_KEY")
+
+	if groqAPIKey == "" {
+		log.Fatal("GROQ_API_KEY not set")
 	}
 
-	maxLen := 400
-	var final strings.Builder
+	interval := 2*time.Hour + 24*time.Minute
 
-	for i := 0; i < len(text); i += maxLen {
-		end := i + maxLen
-		if end > len(text) {
-			end = len(text)
-		}
-		part := text[i:end]
-		translatedPart, err := translateText(part)
-		if err != nil {
-			log.Println("Translate failed for part:", err)
-			translatedPart = "" // skip kalau gagal
-		}
-		final.WriteString(translatedPart)
-		final.WriteString("\n\n")
-	}
-
-	return final.String()
-}
-
-// SaveArticleFullScrape simpan artikel + scrape full content + translate
-func SaveArticleFullScrape(article models.CryptoNews) error {
-	// Scrape full content
-	fullContent, err := fetchFullContent(article.URL)
-	if err != nil {
-		log.Println("Failed to fetch full content, fallback to API content:", err)
-		fullContent = article.Content
-	}
-	article.Content = fullContent
-
-	// Translate full content batch
-	article.ContentIndo = translateFullContent(fullContent)
-
-	// Simpan ke DB, jangan duplikat
-	return db.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&article).Error
-}
-
-
-// SaveCryptoNewsLoop ambil semua article dari endpoint, scrape, translate, simpan
-func SaveCryptoNewsLoop(apiKey string) {
-	interval := 2*time.Hour + 24*time.Minute // 10x sehari
 	for {
-		articles, err := FetchCryptoNews(apiKey) // ambil endpoint
+
+		articles, err := FetchCryptoNews(newsAPIKey)
 		if err != nil {
-			fmt.Println("Error fetching news:", err)
+			log.Println("Error fetching news:", err)
 			time.Sleep(30 * time.Minute)
 			continue
 		}
 
 		for _, a := range articles {
-			// Map endpoint ke models.CryptoNews
+
 			news := models.CryptoNews{
 				ArticleID:    a.ArticleID,
 				SourceName:   a.Source.Name,
@@ -141,15 +135,21 @@ func SaveCryptoNewsLoop(apiKey string) {
 				URL:          a.URL,
 				Title:        a.Title,
 				Description:  a.Description,
-				Content:      a.Content, // sementara, nanti di-overwrite
+				Content:      a.Content,
 				IsUpload:     false,
 			}
 
-			err := SaveArticleFullScrape(news)
+			err := SaveArticleWithGroq(news, groqAPIKey)
 			if err != nil {
-				fmt.Println("Error saving article:", err)
+				log.Fatal("Error saving article:", err)
+				// Hapus kalau sudah ada di DB
+				db.DB.
+					Where("article_id = ?", news.ArticleID).
+					Delete(&models.CryptoNews{})
+
+				continue
 			} else {
-				fmt.Println("Saved full article:", a.Title)
+				log.Println("Saved:", a.Title)
 			}
 		}
 

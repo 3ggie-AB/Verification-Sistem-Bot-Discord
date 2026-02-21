@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"time"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"crypto-member/models"
@@ -21,7 +22,14 @@ func SendNewsToDiscord(dg *discordgo.Session, channelID string) {
 			continue
 		}
 
-		konten := n.Content
+		konten := n.ContentIndo
+
+		if strings.Contains(strings.ToLower(n.ContentIndo), "Maaf, saya tidak dapat mengakses konten") {
+			log.Println("Konten tidak valid, skip:", n.Title)
+			db.DB.Delete(&n)
+			continue
+		}
+
 		if len(konten) > 4000 {
 			konten = konten[:3997] + "..."
 		}
