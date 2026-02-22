@@ -70,4 +70,18 @@ func RoueteApi(api fiber.Router) {
 
 	progress := api.Group("/module-progress")
 	progress.Post("/", handlers.UpdateModuleProgress)
+
+	api.Post("/automessager", handlers.CreateAutoMessager)
+	api.Get("/automessager", handlers.GetAutoMessagers) 
+	api.Get("/automessager/:id", handlers.GetAutoMessagerByID)
+	api.Put("/automessager/:id", handlers.UpdateAutoMessager)
+	api.Patch("/automessager/:id/toggle", handlers.ToggleAutoMessager)
+	api.Delete("/automessager/:id", handlers.DeleteAutoMessager)
+
+	api.Post("/bots", handlers.CreateBot)
+	api.Get("/bots", handlers.GetBots)
+	api.Get("/bots/:id", handlers.GetBotByID)
+	api.Put("/bots/:id", handlers.UpdateBot)
+	api.Patch("/bots/:id/toggle", handlers.ToggleBot)
+	api.Delete("/bots/:id", handlers.DeleteBot)
 }
