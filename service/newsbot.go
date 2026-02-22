@@ -22,10 +22,27 @@ func SendNewsToDiscord(dg *discordgo.Session, channelID string) {
 			continue
 		}
 
-		konten := n.ContentIndo
+		lowerContent := strings.ToLower(n.ContentIndo)
+		konten = strings.ReplaceAll(n.ContentIndo, "?", " - ")
 
-		if strings.Contains(strings.ToLower(n.ContentIndo), "Maaf, saya tidak dapat mengakses konten") {
-			log.Println("Konten tidak valid, skip:", n.Title)
+		invalidPatterns := []string{
+			"tidak dapat mengakses",
+			"tidak bisa mengakses",
+			"tidak bisa membuka link",
+			"cannot access",
+			"as an ai language model",
+		}
+
+		isInvalid := false	
+		for _, pattern := range invalidPatterns {
+			if strings.Contains(lowerContent, pattern) {
+				isInvalid = true
+				break
+			}
+		}
+
+		if isInvalid {
+			log.Println("AI gagal generate konten, skip:", n.Title)
 			db.DB.Delete(&n)
 			continue
 		}
