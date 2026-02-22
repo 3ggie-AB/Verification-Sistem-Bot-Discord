@@ -23,7 +23,7 @@ func SendNewsToDiscord(dg *discordgo.Session, channelID string) {
 		}
 
 		lowerContent := strings.ToLower(n.ContentIndo)
-		konten = strings.ReplaceAll(n.ContentIndo, "?", "-")
+		konten := strings.ReplaceAll(n.ContentIndo, "?", "-")
 
 		invalidPatterns := []string{
 			"tidak dapat mengakses",
